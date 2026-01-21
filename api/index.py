@@ -1,4 +1,4 @@
-from fastapi import FastAPI, File, UploadFile, Form, HTTPException, Request
+from fastapi import FastAPI, File, UploadFile, Form, HTTPException, Request, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 import json
@@ -16,18 +16,16 @@ load_dotenv()
 import sys
 sys.path.append(os.path.dirname(__file__))
 
-# Import local utils (copying logic from previous files)
+# Import local utils
 try:
     from vision_logic import analyze_image
 except ImportError as e:
     print(f"Vision Import Error: {e}")
-    # Fallback only if absolutely necessary
     def analyze_image(img_data, mime_type):
         return {"suitability_score": 70, "market_categorization": "Unknown"}
 
 from webhook_utils import send_webhook
 from email_utils import send_lead_email
-
 
 app = FastAPI()
 
@@ -55,11 +53,83 @@ def get_supabase() -> Client:
         raise HTTPException(status_code=500, detail="Supabase credentials missing")
     return create_client(url, key)
 
+def process_lead_background(lead_record: dict, client_ip: str, user_agent: str):
+    """
+    Background task to handle Meta CAPI, CRM Webhook, and Emails.
+    This runs after the response has been sent to the user.
+    """
+    print(f"Starting background processing for lead {lead_record.get('id')}")
+    
+    # 1. Meta Conversion API
+    try:
+        from api.meta_utils import send_conversion_event
+        send_conversion_event(lead_record, client_ip, user_agent)
+    except Exception as e:
+        print(f"Meta CAPI failed in background: {e}")
+
+    # 2. CRM Webhook
+    webhook_url = os.getenv('CRM_WEBHOOK_URL')
+    if webhook_url:
+        try:
+            supabase = get_supabase()
+            
+            # Prepare CRM payload
+            address = f"{lead_record.get('city', '')}, {lead_record.get('zip_code', '')}"
+            
+            crm_payload = {
+                'campaign': lead_record.get('campaign', ''),
+                'email': lead_record.get('email'),
+                'telephone': lead_record.get('phone'),
+                'address': address,
+                'firstname': lead_record.get('first_name'),
+                'lastname': lead_record.get('last_name'),
+                'image': lead_record.get('image_url', ''),
+                'analyticsid': '', 
+                'age': str(lead_record.get('age', '')),
+                'gender': 'M' if lead_record.get('gender') == 'Male' else 'F',
+                'opt_in': 'true' if lead_record.get('wants_assessment') else 'false'
+            }
+            
+            import requests
+            headers = {
+                'Content-Type': 'application/json',
+                'User-Agent': 'ModelScanner/1.0'
+            }
+            
+            print(f"Sending background webhook to: {webhook_url}")
+            wb_resp = requests.post(webhook_url, json=crm_payload, headers=headers, timeout=10)
+            
+            status = 'success' if wb_resp.status_code < 300 else 'failed'
+            resp_text = wb_resp.text
+            
+        except Exception as e:
+            status = 'failed'
+            resp_text = f"Background Error: {str(e)[:200]}"
+            
+        # Update Webhook Status
+        try:
+            get_supabase().table('leads').update({
+                'webhook_sent': True,
+                'webhook_status': status,
+                'webhook_response': resp_text
+            }).eq('id', lead_record['id']).execute()
+        except Exception as e:
+            print(f"Failed to update webhook status: {e}")
+
+    # 3. Send Email Notification
+    try:
+        print("Sending background email notification...")
+        send_lead_email(lead_record)
+    except Exception as e:
+        print(f"Error sending background email: {e}")
+
 @app.post("/api/lead")
 async def create_lead(
+    background_tasks: BackgroundTasks,  # Injected by FastAPI
     file: Optional[UploadFile] = File(None),
     first_name: str = Form(...),
     last_name: str = Form(...),
+     request: Request = None, # Allow request to be optional or explicit
     age: str = Form(...),
     gender: str = Form(...),
     email: str = Form(...),
@@ -67,7 +137,7 @@ async def create_lead(
     city: str = Form(...),
     zip_code: str = Form(...),
     campaign: Optional[str] = Form(None),
-    wants_assessment: Optional[str] = Form("false"), # Receiving as string from FormData
+    wants_assessment: Optional[str] = Form("false"),
     analysis_data: Optional[str] = Form("{}")
 ):
     try:
@@ -112,12 +182,8 @@ async def create_lead(
                     file_options={"content-type": "application/octet-stream"}
                 )
                 
-                print(f"Upload response: {upload_response}")
-                
                 sb_url = os.getenv('SUPABASE_URL') or os.getenv('VITE_SUPABASE_URL')
                 image_url = f"{sb_url}/storage/v1/object/public/lead-images/{filename}"
-                
-                print(f"Constructed URL: {image_url}")
             except Exception as e:
                 print(f"Upload failed: {e}")
                 return {
@@ -161,93 +227,21 @@ async def create_lead(
         if not result.data:
             raise Exception("Insert failed")
             
-        lead_id = result.data[0]['id']
-
-        # --- 4. Meta Conversion API ---
-        try:
-            from api.meta_utils import send_conversion_event
-            # Get client info from request
-            client_ip = request.client.host
-            user_agent = request.headers.get('user-agent', '')
-            send_conversion_event(lead_record, client_ip, user_agent)
-        except Exception as e:
-            print(f"Meta CAPI failed: {e}")
-
-        # --- 5. CRM Webhook ---
-        webhook_url = os.getenv('CRM_WEBHOOK_URL')
-        if webhook_url:
-            # Format address
-            address = f"{city}, {zip_code}" if city and zip_code else (city or zip_code or "")
-            
-            # Prepare CRM payload
-            crm_payload = {
-                'campaign': campaign or '',
-                'email': email,
-                'telephone': phone,
-                'address': address,
-                'firstname': first_name,
-                'lastname': last_name,
-                'image': image_url or '',
-                'analyticsid': '', 
-                'age': str(age),
-                'gender': 'M' if gender == 'Male' else 'F',
-                'opt_in': 'true' if wants_assessment == 'true' else 'false'
-            }
-            
-            # Inline webhook sending logic
-            try:
-                import requests
-                headers = {
-                    'Content-Type': 'application/json',
-                    'User-Agent': 'ModelScanner/1.0'
-                }
-                
-                print(f"Sending webhook to: {webhook_url}")
-                wb_resp = requests.post(webhook_url, json=crm_payload, headers=headers, timeout=10)
-                
-                status = 'success' if wb_resp.status_code < 300 else 'failed'
-                resp_text = wb_resp.text
-                
-            except requests.exceptions.Timeout:
-                status = 'failed'
-                resp_text = "Timeout: Request took longer than 10 seconds"
-            except requests.exceptions.ConnectionError as e:
-                status = 'failed'
-                resp_text = f"Connection Error: {str(e)[:200]}"
-            except Exception as e:
-                status = 'failed'
-                resp_text = f"Error: {str(e)[:200]}"
-            
-            # Update Webhook Status
-            supabase.table('leads').update({
-                'webhook_sent': True,
-                'webhook_status': status,
-                'webhook_response': resp_text
-            }).eq('id', lead_id).execute()
-
-        else:
-            supabase.table('leads').update({
-                'webhook_status': 'not_configured',
-                'webhook_response': 'CRM_WEBHOOK_URL not set'
-            }).eq('id', lead_id).execute()
-
-        # --- 6. Send Email Notification ---
-        email_data = lead_record.copy()
-        email_data['campaign'] = campaign
-        try:
-            analysis = json.loads(analysis_data)
-            email_data['score'] = analysis.get('suitability_score', 'N/A')
-            email_data['category'] = analysis.get('market_categorization', {}).get('primary', 'N/A')
-        except:
-            email_data['score'] = 'N/A'
-            email_data['category'] = 'N/A'
+        final_record = result.data[0]
         
-        try:
-            print("Sending email notification...")
-            from api.email_utils import send_lead_email
-            send_lead_email(email_data)
-        except Exception as e:
-            print(f"Error sending email: {e}")
+        # --- 4. Queue Background Tasks ---
+        # Get client info for Meta
+        client_ip = request.client.host if request and request.client else "0.0.0.0"
+        user_agent = request.headers.get('user-agent', '') if request else ""
+        
+        background_tasks.add_task(process_lead_background, final_record, client_ip, user_agent)
+            
+        return {
+            "status": "success",
+            "lead_id": final_record['id'],
+            "message": "Lead saved successfully."
+        }
+
             
         return {
             "status": "success",
