@@ -94,6 +94,34 @@ def analyze_image(image_bytes, mime_type="image/jpeg"):
         # Validating input type
         if not image_bytes:
             raise ValueError("No image data provided")
+
+        # Optimization: Resize large images to prevent timeouts
+        try:
+            from PIL import Image
+            import io
+            
+            # Open image from bytes
+            img = Image.open(io.BytesIO(image_bytes))
+            
+            # Resize if Dimension > 1024
+            max_size = 1024
+            if img.width > max_size or img.height > max_size:
+                print(f"Resizing image from {img.width}x{img.height} to max {max_size}px")
+                img.thumbnail((max_size, max_size))
+                
+                # Save back to bytes
+                buffer = io.BytesIO()
+                # Convert to RGB if necessary (e.g. for PNGs with transparency)
+                if img.mode in ("RGBA", "P"):
+                    img = img.convert("RGB")
+                    
+                img.save(buffer, format="JPEG", quality=85)
+                image_bytes = buffer.getvalue()
+                mime_type = "image/jpeg" # Force JPEG after resizing
+                print(f"Resized image size: {len(image_bytes)} bytes")
+                
+        except Exception as e:
+            print(f"Image resizing failed (proceeding with original): {e}")
         
         # Ensure image_bytes is passed correctly
         # The SDK handles bytes directly if passed as a Part with mime_type

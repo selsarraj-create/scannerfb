@@ -6,4 +6,5 @@ python-dotenv
 pydantic
 supabase
 google-generativeai
+Pillow
 # Force cache bust v10 - remove debug logging
