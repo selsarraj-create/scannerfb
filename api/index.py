@@ -120,16 +120,9 @@ async def create_lead(
                 print(f"Constructed URL: {image_url}")
             except Exception as e:
                 print(f"Upload failed: {e}")
-                # Save error to database to view in admin
-                supabase.table('leads').update({
-                    'webhook_status': 'upload_failed',
-                    'webhook_response': f"Image Upload Error: {str(e)}"
-                }).eq('id', lead_id).execute()
-                # Stop processing to prevent sending incomplete data
                 return {
                     "status": "error",
                     "message": f"Image upload failed: {str(e)}",
-                    "id": response.data[0]['id']
                 }
 
         # 3. Prepare Data
