@@ -163,25 +163,6 @@ async def create_lead(
             
         lead_id = result.data[0]['id']
         
-        # 4. Webhook - Format payload for CRM API
-        webhook_url = os.getenv('CRM_WEBHOOK_URL')
-        if webhook_url:
-            # Format address from city and zip
-            address = f"{city}, {zip_code}" if city and zip_code else (city or zip_code or "")
-            
-            # Prepare CRM payload matching the expected structure
-            crm_payload = {
-                'campaign': campaign or '',
-                'email': email,
-                'telephone': phone,
-                'address': address,
-                'firstname': first_name,
-                'lastname': last_name,
-                'image': image_url or '',
-                'analyticsid': '',  # Can be populated if you track analytics
-                'age': str(age),
-                'gender': 'M' if gender == 'Male' else 'F',
-                'opt_in': 'true' if wants_assessment == 'true' else 'false'
             }
             
             # Inline webhook sending logic to ensure robust error handling
