@@ -11,15 +11,15 @@ const ProcessingAnimation = ({ onComplete }) => {
     ];
 
     useEffect(() => {
-        const completeTimeout = setTimeout(() => {
-            onComplete();
-        }, 4000);
+        // Cycle text every 1 other second
+        const textInterval = setInterval(() => {
+            setTextIndex((prev) => (prev + 1) % messages.length);
+        }, 1200);
 
         return () => {
             clearInterval(textInterval);
-            clearTimeout(completeTimeout);
         };
-    }, [onComplete]);
+    }, []);
 
     return (
         <div className="relative w-full h-full flex flex-col items-center justify-center overflow-hidden rounded-xl">

@@ -39,6 +39,14 @@ const Scanner = () => {
                 timeout: 60000 // 60 seconds to accommodate Gemini API processing time
             });
             setAnalysisResult(response.data);
+
+            // Check for errors in the response body even if status is 200
+            if (response.data.error) {
+                throw new Error(response.data.error);
+            }
+
+            // Natural Transition: Immediately show results when ready
+            setState('PREVIEW');
         } catch (error) {
             console.error("Analysis failed", error);
             alert("Analysis failed. Please try again.");
@@ -54,38 +62,9 @@ const Scanner = () => {
         }
     };
 
-    const onAnimationComplete = () => {
-        // Just signal that animation is done. 
-        // The transition logic is now handled in a useEffect below.
-        setState((curr) => curr === 'PROCESSING' ? 'WAITING_FOR_RESULT' : curr);
-    };
+    // Removed onAnimationComplete as we now rely on the API response for natural timing
 
-    // New Effect: Handle state transition when both Animation and API are done
-    React.useEffect(() => {
-        if (state === 'WAITING_FOR_RESULT') {
-            if (analysisResult) {
-                if (analysisResult.error) {
-                    console.error("Backend Error:", analysisResult.error);
-                    alert(`Analysis Failed: ${analysisResult.error}`);
-                    setState('IDLE');
-                    return;
-                }
-                setState('PREVIEW');
-            } else {
-                // Polling logic or just wait for analysisResult to trigger re-render
-                // Actually, if we are in WAITING_FOR_RESULT, we just wait. 
-                // We only need a safety timeout here.
-                const safetyTimer = setTimeout(() => {
-                    if (!analysisResult) {
-                        console.error("Analysis timed out.");
-                        alert("Server timeout. Please check console logs.");
-                        setState('IDLE');
-                    }
-                }, 30000);
-                return () => clearTimeout(safetyTimer);
-            }
-        }
-    }, [state, analysisResult]);
+    // Removed useEffect for WAITING_FOR_RESULT state transition
 
     // Effect: If analysis comes in EARLY (while processing), we don't do anything yet.
     // We wait for user to hit WAITING_FOR_RESULT (animation done).
@@ -145,17 +124,12 @@ const Scanner = () => {
                 )}
 
                 {/* PROCESSING STATE */}
-                {(state === 'PROCESSING' || state === 'WAITING_FOR_RESULT') && (
+                {state === 'PROCESSING' && (
                     <>
                         <img src={previewUrl} className="absolute inset-0 w-full h-full object-cover opacity-50 filter grayscale" alt="Scanning" />
                         <div className="absolute inset-0 z-10">
-                            <ProcessingAnimation onComplete={onAnimationComplete} />
+                            <ProcessingAnimation />
                         </div>
-                        {state === 'WAITING_FOR_RESULT' && (
-                            <div className="absolute bottom-10 left-0 right-0 text-center z-50">
-                                <p className="text-pastel-accent text-xs animate-pulse">Finalizing Analysis...</p>
-                            </div>
-                        )}
                     </>
                 )}
 
