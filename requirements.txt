@@ -1,0 +1,9 @@
+fastapi
+uvicorn
+google-genai
+python-multipart
+python-dotenv
+pydantic
+supabase
+google-generativeai
+# Force cache bust v10 - remove debug logging
