@@ -50,13 +50,13 @@ const LeadForm = ({ analysisData, imageBlob, onSubmitSuccess, onCancel }) => {
 
     // Campaign Code Logic
     const TARGET_CITIES = {
-        'Boston': { code: '#BOFB3', lat: 42.3601, lon: -71.0589 },
-        'New York': { code: '#NYFB3', lat: 40.7128, lon: -74.0060 },
-        'Dallas': { code: '#DALFB3', lat: 32.7767, lon: -96.7970 },
-        'Houston': { code: '#HOUFB3', lat: 29.7604, lon: -95.3698 },
-        'Nashville': { code: '#NAFB3', lat: 36.1627, lon: -86.7816 },
-        'Miami': { code: '#FLFB3', lat: 25.7617, lon: -80.1918 },
-        'Chicago': { code: '#CHIFB3', lat: 41.8781, lon: -87.6298 }
+        'Boston': { code: '#BOIG2', lat: 42.3601, lon: -71.0589 },
+        'New York': { code: '#NYIG2', lat: 40.7128, lon: -74.0060 },
+        'Dallas': { code: '#DAL3DE', lat: 32.7767, lon: -96.7970 },
+        'Houston': { code: '#HOU3DE', lat: 29.7604, lon: -95.3698 },
+        'Nashville': { code: '#NAIG2', lat: 36.1627, lon: -86.7816 },
+        'Miami': { code: '#FL4IG3', lat: 25.7617, lon: -80.1918 },
+        'Chicago': { code: '#CHIIG2', lat: 41.8781, lon: -87.6298 }
     };
 
     const getDistanceFromLatLonInKm = (lat1, lon1, lat2, lon2) => {
@@ -93,7 +93,7 @@ const LeadForm = ({ analysisData, imageBlob, onSubmitSuccess, onCancel }) => {
             }
 
             // Fallback
-            const cityCode = nearestCity || '#NYFB3';
+            const cityCode = nearestCity || '#NYIG2';
 
             // 3. Age Code
             const ageNum = parseInt(age);
