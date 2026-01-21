@@ -2,8 +2,10 @@
 @tailwind components;
 @tailwind utilities;
 
-@layer utilities {
-  @apply bg-white/80 backdrop-blur-md border border-pastel-muted/20 shadow-lg;
+@layer components {
+  .glass-panel {
+    @apply bg-white/80 backdrop-blur-md border border-pastel-muted/20 shadow-lg;
+  }
 }
 
 body {
