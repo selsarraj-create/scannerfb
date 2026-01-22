@@ -330,7 +330,8 @@ const LeadForm = ({ analysisData, imageBlob, onSubmitSuccess, onCancel }) => {
                     </form>
                 </div>
             </div>
-            );
+        </div>
+    );
 };
 
-            export default LeadForm;
+export default LeadForm;
