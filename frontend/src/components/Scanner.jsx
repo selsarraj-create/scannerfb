@@ -116,7 +116,7 @@ const Scanner = () => {
                             onChange={(e) => handleFileSelect(e.target.files[0])}
                         />
 
-                        <p className="text-lg font-serif italic text-white/90 mb-8 text-center px-6">
+                        <p className="text-lg font-serif italic text-pastel-accent/70 mb-8 text-center px-6">
                             We&apos;re always looking for <br className="block sm:hidden" /> new faces to join us
                         </p>
 
