@@ -6,23 +6,23 @@ const testimonials = [
     {
         id: 1,
         name: "Sarah Jenkins",
-        role: "Signed with Elite",
+        role: "Aspiring Model",
         quote: "I never thought I had model potential until I used this scanner. Two weeks later, I was signed!",
-        imagePosition: "object-left-top",
+        image: "/t-sarah.png"
     },
     {
         id: 2,
         name: "Michael Chen",
         role: "Commercial Model",
         quote: "The analysis was spot on about my face shape. It gave me the confidence to apply to agencies.",
-        imagePosition: "object-right-top",
+        image: "/t-michael.png"
     },
     {
         id: 3,
         name: "Jessica Williams",
         role: "Freelance Talent",
         quote: "Fast, accurate, and incredibly helpful. The agency finder tool is a game changer.",
-        imagePosition: "object-center-bottom",
+        image: "/t-jessica.png"
     }
 ];
 
@@ -41,11 +41,11 @@ const Testimonials = () => {
 
                         <div className="flex items-center gap-4 mb-4">
                             <div className="w-16 h-16 rounded-full overflow-hidden border-2 border-pastel-accent/50">
-                                {/* Using the collage image with object-position to show different faces */}
+                                {/* Using individual images */}
                                 <img
-                                    src="/testimonials.png"
+                                    src={testimonial.image}
                                     alt={testimonial.name}
-                                    className={`w-full h-full object-cover ${testimonial.imagePosition} scale-150`}
+                                    className="w-full h-full object-cover"
                                 />
                             </div>
                             <div>
