@@ -3,7 +3,7 @@ import { supabase } from '../lib/supabaseClient';
 import { useNavigate } from 'react-router-dom';
 import {
     LogOut, RefreshCw, CheckCircle, XCircle, Clock,
-    Search, Calendar, Filter, Download
+    Search, Calendar, Filter, Download, Send
 } from 'lucide-react';
 import axios from 'axios';
 
@@ -12,6 +12,9 @@ const Admin = () => {
     const [loading, setLoading] = useState(true);
     const [searchTerm, setSearchTerm] = useState('');
     const [resendingId, setResendingId] = useState(null);
+    const [selectedIds, setSelectedIds] = useState(new Set());
+    const [bulkSending, setBulkSending] = useState(false);
+    const [bulkProgress, setBulkProgress] = useState({ done: 0, total: 0 });
     const navigate = useNavigate();
 
     const API_URL = import.meta.env.MODE === 'production' ? '/api' : 'http://localhost:8000';
@@ -61,7 +64,6 @@ const Admin = () => {
         setResendingId(leadId);
         try {
             await axios.post(`${API_URL}/retry_webhook`, { lead_id: leadId });
-            // Refresh specific row or whole table
             fetchLeads();
         } catch (error) {
             console.error('Retry failed:', error);
@@ -69,6 +71,47 @@ const Admin = () => {
         } finally {
             setResendingId(null);
         }
+    };
+
+    const toggleSelect = (id) => {
+        setSelectedIds(prev => {
+            const next = new Set(prev);
+            if (next.has(id)) next.delete(id);
+            else next.add(id);
+            return next;
+        });
+    };
+
+    const toggleSelectAll = () => {
+        if (selectedIds.size === filteredLeads.length) {
+            setSelectedIds(new Set());
+        } else {
+            setSelectedIds(new Set(filteredLeads.map(l => l.id)));
+        }
+    };
+
+    const handleBulkResend = async () => {
+        const ids = Array.from(selectedIds);
+        if (ids.length === 0) return;
+        if (!confirm(`Resend CRM webhook for ${ids.length} lead(s)?`)) return;
+
+        setBulkSending(true);
+        setBulkProgress({ done: 0, total: ids.length });
+        let failures = 0;
+
+        for (let i = 0; i < ids.length; i++) {
+            try {
+                await axios.post(`${API_URL}/retry_webhook`, { lead_id: ids[i] });
+            } catch {
+                failures++;
+            }
+            setBulkProgress({ done: i + 1, total: ids.length });
+        }
+
+        setBulkSending(false);
+        setSelectedIds(new Set());
+        fetchLeads();
+        if (failures > 0) alert(`${failures} of ${ids.length} resends failed.`);
     };
 
     const filteredLeads = leads.filter(lead =>
@@ -120,6 +163,19 @@ const Admin = () => {
                     <button onClick={fetchLeads} className="flex items-center gap-2 px-4 py-2 rounded-lg bg-white/5 hover:bg-white/10 transition-colors">
                         <RefreshCw size={18} className={loading ? "animate-spin" : ""} /> Refresh
                     </button>
+                    {selectedIds.size > 0 && (
+                        <button
+                            onClick={handleBulkResend}
+                            disabled={bulkSending}
+                            className="flex items-center gap-2 px-4 py-2 rounded-lg bg-blue-600 text-white font-semibold hover:bg-blue-500 transition-colors disabled:opacity-50"
+                        >
+                            <Send size={18} />
+                            {bulkSending
+                                ? `Sending ${bulkProgress.done}/${bulkProgress.total}...`
+                                : `Resend CRM (${selectedIds.size})`
+                            }
+                        </button>
+                    )}
                     <button className="flex items-center gap-2 px-4 py-2 rounded-lg bg-pastel-accent text-white font-semibold hover:bg-red-300 transition-colors">
                         <Download size={18} /> Export CSV
                     </button>
@@ -131,6 +187,14 @@ const Admin = () => {
                         <table className="w-full text-left border-collapse">
                             <thead>
                                 <tr className="bg-gray-50 border-b border-gray-100 text-xs uppercase text-pastel-muted">
+                                    <th className="p-4 font-semibold">
+                                        <input
+                                            type="checkbox"
+                                            checked={filteredLeads.length > 0 && selectedIds.size === filteredLeads.length}
+                                            onChange={toggleSelectAll}
+                                            className="w-4 h-4 rounded accent-pastel-accent cursor-pointer"
+                                        />
+                                    </th>
                                     <th className="p-4 font-semibold">Date</th>
                                     <th className="p-4 font-semibold">Photo</th>
                                     <th className="p-4 font-semibold">Name</th>
@@ -144,12 +208,20 @@ const Admin = () => {
                             </thead>
                             <tbody className="divide-y divide-gray-100 text-sm">
                                 {loading ? (
-                                    <tr><td colSpan="8" className="p-8 text-center text-gray-500">Loading leads...</td></tr>
+                                    <tr><td colSpan="10" className="p-8 text-center text-gray-500">Loading leads...</td></tr>
                                 ) : filteredLeads.length === 0 ? (
-                                    <tr><td colSpan="8" className="p-8 text-center text-gray-500">No leads found matching your search.</td></tr>
+                                    <tr><td colSpan="10" className="p-8 text-center text-gray-500">No leads found matching your search.</td></tr>
                                 ) : (
                                     filteredLeads.map(lead => (
-                                        <tr key={lead.id} className="hover:bg-gray-50 transition-colors">
+                                        <tr key={lead.id} className={`hover:bg-gray-50 transition-colors ${selectedIds.has(lead.id) ? 'bg-blue-500/5' : ''}`}>
+                                            <td className="p-4">
+                                                <input
+                                                    type="checkbox"
+                                                    checked={selectedIds.has(lead.id)}
+                                                    onChange={() => toggleSelect(lead.id)}
+                                                    className="w-4 h-4 rounded accent-pastel-accent cursor-pointer"
+                                                />
+                                            </td>
                                             <td className="p-4 text-gray-400 whitespace-nowrap">
                                                 {new Date(lead.created_at).toLocaleDateString()}
                                                 <div className="text-xs opacity-60">{new Date(lead.created_at).toLocaleTimeString()}</div>
