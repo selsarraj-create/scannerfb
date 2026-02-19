@@ -15,6 +15,7 @@ const Admin = () => {
     const [selectedIds, setSelectedIds] = useState(new Set());
     const [bulkSending, setBulkSending] = useState(false);
     const [bulkProgress, setBulkProgress] = useState({ done: 0, total: 0 });
+    const [webhookFilter, setWebhookFilter] = useState('all');
     const navigate = useNavigate();
 
     const API_URL = import.meta.env.MODE === 'production' ? '/api' : 'http://localhost:8000';
@@ -122,11 +123,14 @@ const Admin = () => {
         }
     };
 
-    const filteredLeads = leads.filter(lead =>
-        lead.first_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        lead.last_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        lead.email.toLowerCase().includes(searchTerm.toLowerCase())
-    );
+    const filteredLeads = leads.filter(lead => {
+        const matchesSearch =
+            lead.first_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+            lead.last_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+            lead.email.toLowerCase().includes(searchTerm.toLowerCase());
+        const matchesWebhook = webhookFilter === 'all' || lead.webhook_status === webhookFilter;
+        return matchesSearch && matchesWebhook;
+    });
 
     const getStatusIcon = (status) => {
         switch (status) {
@@ -168,6 +172,16 @@ const Admin = () => {
                             onChange={e => setSearchTerm(e.target.value)}
                         />
                     </div>
+                    <select
+                        value={webhookFilter}
+                        onChange={e => setWebhookFilter(e.target.value)}
+                        className="bg-white border border-gray-200 rounded-lg py-2.5 px-4 text-sm focus:outline-none focus:border-pastel-accent cursor-pointer"
+                    >
+                        <option value="all">All Status</option>
+                        <option value="success">✅ Success</option>
+                        <option value="failed">❌ Failed</option>
+                        <option value="pending">⏳ Pending</option>
+                    </select>
                     <button onClick={fetchLeads} className="flex items-center gap-2 px-4 py-2 rounded-lg bg-white/5 hover:bg-white/10 transition-colors">
                         <RefreshCw size={18} className={loading ? "animate-spin" : ""} /> Refresh
                     </button>
