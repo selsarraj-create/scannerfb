@@ -299,10 +299,10 @@ async def retry_webhook(req: RetryRequest):
         
         wb_resp = send_webhook(webhook_url, lead_record)
         
-        status = 'success' if wb_resp and wb_resp.status_code < 300 else 'failed'
-        resp_text = wb_resp.text if wb_resp else "Connection failed"
+        status = 'success' if wb_resp is not None and wb_resp.status_code < 300 else 'failed'
+        resp_text = wb_resp.text if wb_resp is not None else "Connection failed"
         
-        print(f"[RETRY_WEBHOOK] Webhook response: status_code={wb_resp.status_code if wb_resp else 'None'}, result={status}")
+        print(f"[RETRY_WEBHOOK] Webhook response: status_code={wb_resp.status_code if wb_resp is not None else 'None'}, result={status}")
         print(f"[RETRY_WEBHOOK] Response body: {resp_text[:500]}")
         
         supabase.table('leads').update({
