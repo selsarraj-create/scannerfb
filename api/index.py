@@ -278,22 +278,32 @@ class RetryRequest(BaseModel):
 
 @app.post("/api/retry_webhook")
 async def retry_webhook(req: RetryRequest):
+    print(f"[RETRY_WEBHOOK] Starting retry for lead_id={req.lead_id}")
     try:
         supabase = get_supabase()
         webhook_url = os.getenv('CRM_WEBHOOK_URL')
         
         if not webhook_url:
+            print("[RETRY_WEBHOOK] ERROR: CRM_WEBHOOK_URL not configured")
             raise HTTPException(status_code=400, detail="CRM_WEBHOOK_URL not configured")
+        
+        print(f"[RETRY_WEBHOOK] Webhook URL: {webhook_url[:30]}...")
             
         resp = supabase.table('leads').select('*').eq('id', req.lead_id).execute()
         if not resp.data:
-             raise HTTPException(status_code=404, detail="Lead not found")
+            print(f"[RETRY_WEBHOOK] ERROR: Lead {req.lead_id} not found in database")
+            raise HTTPException(status_code=404, detail="Lead not found")
              
         lead_record = resp.data[0]
+        print(f"[RETRY_WEBHOOK] Found lead: {lead_record.get('first_name')} {lead_record.get('last_name')} ({lead_record.get('email')})")
+        
         wb_resp = send_webhook(webhook_url, lead_record)
         
         status = 'success' if wb_resp and wb_resp.status_code < 300 else 'failed'
         resp_text = wb_resp.text if wb_resp else "Connection failed"
+        
+        print(f"[RETRY_WEBHOOK] Webhook response: status_code={wb_resp.status_code if wb_resp else 'None'}, result={status}")
+        print(f"[RETRY_WEBHOOK] Response body: {resp_text[:500]}")
         
         supabase.table('leads').update({
             'webhook_sent': True,
@@ -301,13 +311,19 @@ async def retry_webhook(req: RetryRequest):
             'webhook_response': resp_text
         }).eq('id', req.lead_id).execute()
         
+        print(f"[RETRY_WEBHOOK] Database updated for lead {req.lead_id}, status={status}")
+        
         return {
             "status": "success", 
             "message": "Webhook retry attempted",
-            "webhook_status": status
+            "webhook_status": status,
+            "webhook_response": resp_text[:200]
         }
+    except HTTPException:
+        raise
     except Exception as e:
-         return JSONResponse(status_code=500, content={"error": str(e)})
+        print(f"[RETRY_WEBHOOK] EXCEPTION for lead {req.lead_id}: {type(e).__name__}: {str(e)}")
+        return JSONResponse(status_code=500, content={"error": str(e)})
 
 @app.get("/api/test_webhook")
 async def test_webhook_connection():

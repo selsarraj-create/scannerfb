@@ -98,12 +98,18 @@ const Admin = () => {
         setBulkSending(true);
         setBulkProgress({ done: 0, total: ids.length });
         let failures = 0;
+        const errors = [];
 
         for (let i = 0; i < ids.length; i++) {
             try {
-                await axios.post(`${API_URL}/retry_webhook`, { lead_id: ids[i] });
-            } catch {
+                console.log(`[BULK RESEND] Sending ${i + 1}/${ids.length} — lead_id: ${ids[i]}`);
+                const res = await axios.post(`${API_URL}/retry_webhook`, { lead_id: ids[i] });
+                console.log(`[BULK RESEND] Response for ${ids[i]}:`, res.data);
+            } catch (err) {
                 failures++;
+                const detail = err.response?.data?.error || err.response?.data?.detail || err.message;
+                console.error(`[BULK RESEND] FAILED for ${ids[i]}:`, detail, err.response?.status);
+                errors.push(`${ids[i]}: ${detail}`);
             }
             setBulkProgress({ done: i + 1, total: ids.length });
         }
@@ -111,7 +117,9 @@ const Admin = () => {
         setBulkSending(false);
         setSelectedIds(new Set());
         fetchLeads();
-        if (failures > 0) alert(`${failures} of ${ids.length} resends failed.`);
+        if (failures > 0) {
+            alert(`${failures} of ${ids.length} resends failed.\n\n${errors.join('\n')}`);
+        }
     };
 
     const filteredLeads = leads.filter(lead =>
