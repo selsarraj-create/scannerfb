@@ -297,7 +297,24 @@ async def retry_webhook(req: RetryRequest):
         lead_record = resp.data[0]
         print(f"[RETRY_WEBHOOK] Found lead: {lead_record.get('first_name')} {lead_record.get('last_name')} ({lead_record.get('email')})")
         
-        wb_resp = send_webhook(webhook_url, lead_record)
+        # Build CRM payload (must match format in process_lead_background)
+        address = f"{lead_record.get('city', '')}, {lead_record.get('zip_code', '')}"
+        crm_payload = {
+            'campaign': lead_record.get('campaign', ''),
+            'email': lead_record.get('email'),
+            'telephone': lead_record.get('phone'),
+            'address': address,
+            'firstname': lead_record.get('first_name'),
+            'lastname': lead_record.get('last_name'),
+            'image': lead_record.get('image_url', ''),
+            'analyticsid': '',
+            'age': str(lead_record.get('age', '')),
+            'gender': 'M' if lead_record.get('gender') == 'Male' else 'F',
+            'opt_in': 'true' if lead_record.get('wants_assessment') else 'false'
+        }
+        print(f"[RETRY_WEBHOOK] CRM payload telephone: {crm_payload['telephone']}")
+        
+        wb_resp = send_webhook(webhook_url, crm_payload)
         
         status = 'success' if wb_resp is not None and wb_resp.status_code < 300 else 'failed'
         resp_text = wb_resp.text if wb_resp is not None else "Connection failed"
