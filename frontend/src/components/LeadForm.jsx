@@ -80,21 +80,29 @@ const LeadForm = ({ analysisData, imageBlob, onSubmitSuccess, onCancel }) => {
             const userLat = parseFloat(place.latitude);
             const userLon = parseFloat(place.longitude);
             const cityName = place['place name'];
+            const state = place['state abbreviation'];
 
-            // 2. Find Nearest City
-            let nearestCity = null;
-            let minDistance = Infinity;
+            // 2. State Override: Force Boston for New England states
+            const bostonStates = ['CT', 'MA', 'NH', 'RI'];
+            let cityCode;
 
-            for (const [city, data] of Object.entries(TARGET_CITIES)) {
-                const distance = getDistanceFromLatLonInKm(userLat, userLon, data.lat, data.lon);
-                if (distance < minDistance) {
-                    minDistance = distance;
-                    nearestCity = data.code;
+            if (bostonStates.includes(state)) {
+                cityCode = '#BOIG2';
+            } else {
+                // 3. Find Nearest City by distance
+                let nearestCity = null;
+                let minDistance = Infinity;
+
+                for (const [city, data] of Object.entries(TARGET_CITIES)) {
+                    const distance = getDistanceFromLatLonInKm(userLat, userLon, data.lat, data.lon);
+                    if (distance < minDistance) {
+                        minDistance = distance;
+                        nearestCity = data.code;
+                    }
                 }
-            }
 
-            // Fallback
-            const cityCode = nearestCity || '#NYIG2';
+                cityCode = nearestCity || '#NYIG2';
+            }
 
             // 3. Age Code
             const ageNum = parseInt(age);
