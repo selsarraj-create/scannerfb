@@ -82,12 +82,15 @@ const LeadForm = ({ analysisData, imageBlob, onSubmitSuccess, onCancel }) => {
             const cityName = place['place name'];
             const state = place['state abbreviation'];
 
-            // 2. State Override: Force Boston for New England states
+            // 2. State Overrides
             const bostonStates = ['CT', 'MA', 'NH', 'RI'];
             let cityCode;
 
             if (bostonStates.includes(state)) {
                 cityCode = '#BOIG2';
+            } else if (state === 'FL' && userLat <= 27.96) {
+                // Florida override: anything at or below Tampa → Miami
+                cityCode = '#FL4IG3';
             } else {
                 // 3. Find Nearest City by distance
                 let nearestCity = null;
